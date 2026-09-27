@@ -1,0 +1,47 @@
+# โฟลเดอร์แพ็กเกจภายนอก (Dependencies)
+node_modules/
+.npm
+
+# ไฟล์เก็บความลับและตัวแปรระบบ (ห้ามอัปโหลดขึ้น Git เด็ดขาด)
+.env
+.env.local
+.env.*.local
+
+# ผลลัพธ์จากการคอมไพล์และ Build
+dist/
+.next/
+out/
+
+# แคชของ Turborepo
+.turbo/
+
+# ไฟล์การตั้งค่าของโปรแกรมเขียนโค้ด (IDE)
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ไฟล์ขยะของระบบปฏิบัติการ Windows / macOS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ไฟล์บันทึกข้อผิดพลาด (Logs)
+*.log
+npm-debug.log*
+logs/
+
+# ไฟล์ฐานข้อมูลชั่วคราว
+packages/database/prisma/*.db
+packages/database/prisma/*.db-journal
+
+# ไฟล์สำรองข้อมูลเซิร์ฟเวอร์ (ห้ามเอาขึ้น Git เพราะไฟล์มีขนาดใหญ่)
+backups/
+
+# ไฟล์ตัวเกม Minecraft โลก และปลั๊กอิน (ห้ามเอาขึ้น Git)
+*.jar
+world/
+world_nether/
+world_the_end/
+plugins/
+cache/

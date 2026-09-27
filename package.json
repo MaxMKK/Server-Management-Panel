@@ -1,0 +1,28 @@
+{
+  "name": "minecraft-panel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minecraft Server Control Panel — Multi-server management dashboard",
+  "packageManager": "npm@11.17.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npx -y concurrently -k -n \"api,web\" -c \"cyan,magenta\" \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:turbo": "npx -y turbo run dev",
+    "build": "npx -y turbo run build",
+    "lint": "npx -y turbo run lint",
+    "clean": "npx -y turbo run clean",
+    "dev:web": "npm run dev --workspace=@minecraft-panel/web",
+    "dev:api": "npm run dev --workspace=@minecraft-panel/api",
+    "db:generate": "npm run generate --workspace=packages/database",
+    "db:push": "npm run push --workspace=packages/database",
+    "db:migrate": "npm run migrate --workspace=packages/database",
+    "db:seed": "npm run seed --workspace=packages/database",
+    "db:studio": "npm run studio --workspace=packages/database"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
