@@ -8,6 +8,7 @@ import { errorHandler } from './middleware/error-handler.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { serverRoutes } from './modules/servers/server.routes.js';
 import { ServerManager } from './services/server-manager/server-manager.js';
+import { RconPool } from './services/rcon/rcon-pool.js';
 
 /**
  * ฟังก์ชันสร้างและตั้งค่า Fastify Application พร้อมปลั๊กอินความปลอดภัยทั้งหมด
@@ -96,6 +97,12 @@ export async function buildApp(): Promise<FastifyInstance> {
         message: 'ไม่พบเส้นทาง API นี้ในระบบ',
       },
     });
+  });
+
+  // ── ปิดการเชื่อมต่อ RCON ทั้งหมดเมื่อ Fastify ทำการปิดตัวลง ─────
+  app.addHook('onClose', async () => {
+    logger.info('⏹️  กำลังปิดการเชื่อมต่อ RCON ทั้งหมดใน Pool...');
+    RconPool.getInstance().destroy();
   });
 
   logger.info('✅ ประกอบแอปพลิเคชัน Fastify เรียบร้อยแล้ว');

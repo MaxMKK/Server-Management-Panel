@@ -4,6 +4,7 @@ import { prisma } from '@minecraft-panel/database';
 import { ApiResponse, ErrorCode, Permission } from '@minecraft-panel/shared';
 import { ServerManager } from '../../services/server-manager/server-manager.js';
 import { CryptoService } from '../../services/crypto.service.js';
+import { RconPool } from '../../services/rcon/rcon-pool.js';
 import { authenticate } from '../../middleware/auth.js';
 import { requirePermission } from '../../middleware/permission.js';
 
@@ -319,6 +320,156 @@ export async function serverRoutes(fastify: FastifyInstance): Promise<void> {
       const response: ApiResponse = {
         success: true,
         data: logs,
+      };
+      return reply.status(200).send(response);
+    }
+  );
+
+  // ── 8. ส่งคำสั่งผ่าน RCON (POST /api/servers/:id/rcon/exec) ───────────────
+  fastify.post<{ Params: ServerIdParams }>(
+    '/:id/rcon/exec',
+    { preHandler: [authenticate, requirePermission(Permission.CONSOLE_EXECUTE)] },
+    async (request, reply) => {
+      const { id } = request.params;
+      const body = request.body as { command?: string };
+
+      if (!body?.command || typeof body.command !== 'string' || !body.command.trim()) {
+        const response: ApiResponse = {
+          success: false,
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'กรุณาระบุคำสั่งที่ต้องการส่ง',
+          },
+        };
+        return reply.status(400).send(response);
+      }
+
+      // ป้องกันคำสั่งที่มีการแทรก null byte หรือ newline อันตราย
+      const cleanCommand = body.command.replace(/[\r\n\0]/g, '').trim();
+
+      const server = await prisma.server.findUnique({
+        where: { id },
+      });
+
+      if (!server) {
+        const response: ApiResponse = {
+          success: false,
+          error: {
+            code: ErrorCode.SERVER_NOT_FOUND,
+            message: 'ไม่พบเซิร์ฟเวอร์นี้ในระบบ',
+          },
+        };
+        return reply.status(404).send(response);
+      }
+
+      let rconPassword = '';
+      try {
+        rconPassword = CryptoService.decrypt(server.rconPasswordEncrypted);
+      } catch (err) {
+        const response: ApiResponse = {
+          success: false,
+          error: {
+            code: ErrorCode.INTERNAL_ERROR,
+            message: 'ไม่สามารถถอดรหัสผ่าน RCON สำหรับเชื่อมต่อได้',
+          },
+        };
+        return reply.status(500).send(response);
+      }
+
+      const rconPool = RconPool.getInstance();
+      const startTime = Date.now();
+
+      try {
+        const rconResponse = await rconPool.executeCommand(
+          server.id,
+          {
+            host: '127.0.0.1', // บังคับเชื่อมต่อผ่าน Localhost เพื่อความปลอดภัย
+            port: server.rconPort,
+            password: rconPassword,
+            timeoutMs: 10000,
+          },
+          cleanCommand
+        );
+
+        const executionTimeMs = Date.now() - startTime;
+
+        // บันทึกประวัติการรันคำสั่งลงใน AuditLog
+        await prisma.auditLog.create({
+          data: {
+            userId: request.user?.userId,
+            serverId: id,
+            action: 'RCON_EXECUTE',
+            category: 'SERVER',
+            ipAddress: request.ip,
+            details: JSON.stringify({ command: cleanCommand, executionTimeMs }),
+            result: 'SUCCESS',
+          },
+        });
+
+        const response: ApiResponse = {
+          success: true,
+          data: {
+            command: cleanCommand,
+            response: rconResponse,
+            executionTimeMs,
+          },
+        };
+        return reply.status(200).send(response);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการส่งคำสั่ง RCON';
+        const isAuthError = msg.includes('Authentication Failed') || msg.includes('รหัสผ่าน RCON ไม่ถูกต้อง');
+        const isTimeout = msg.includes('หมดเวลา') || msg.includes('Timeout');
+
+        let code = ErrorCode.RCON_COMMAND_FAILED;
+        if (isAuthError) {
+          code = ErrorCode.RCON_AUTH_FAILED;
+        } else if (isTimeout) {
+          code = ErrorCode.RCON_TIMEOUT;
+        }
+
+        const response: ApiResponse = {
+          success: false,
+          error: {
+            code,
+            message: msg,
+          },
+        };
+        return reply.status(400).send(response);
+      }
+    }
+  );
+
+  // ── 9. ตรวจสอบสถานะการเชื่อมต่อ RCON (GET /api/servers/:id/rcon/status) ────
+  fastify.get<{ Params: ServerIdParams }>(
+    '/:id/rcon/status',
+    { preHandler: [authenticate, requirePermission(Permission.CONSOLE_VIEW)] },
+    async (request, reply) => {
+      const { id } = request.params;
+      const server = await prisma.server.findUnique({
+        where: { id },
+      });
+
+      if (!server) {
+        const response: ApiResponse = {
+          success: false,
+          error: {
+            code: ErrorCode.SERVER_NOT_FOUND,
+            message: 'ไม่พบเซิร์ฟเวอร์นี้ในระบบ',
+          },
+        };
+        return reply.status(404).send(response);
+      }
+
+      const rconPool = RconPool.getInstance();
+      const connected = rconPool.isConnected(id);
+
+      const response: ApiResponse = {
+        success: true,
+        data: {
+          connected,
+          host: '127.0.0.1',
+          port: server.rconPort,
+        },
       };
       return reply.status(200).send(response);
     }

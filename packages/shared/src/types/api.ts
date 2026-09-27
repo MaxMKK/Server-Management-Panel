@@ -57,6 +57,7 @@ export enum ErrorCode {
   RCON_CONNECTION_FAILED = 'RCON_CONNECTION_FAILED',   // เชื่อมต่อ RCON ไม่สำเร็จ
   RCON_COMMAND_FAILED = 'RCON_COMMAND_FAILED',         // ส่งคำสั่ง RCON ไม่สำเร็จ
   RCON_TIMEOUT = 'RCON_TIMEOUT',                       // การเชื่อมต่อ RCON หมดเวลา
+  RCON_AUTH_FAILED = 'RCON_AUTH_FAILED',               // รหัสผ่าน RCON ไม่ถูกต้อง
 
   // ข้อผิดพลาดด้านระบบไฟล์
   FILE_NOT_FOUND = 'FILE_NOT_FOUND',           // ไม่พบไฟล์ที่ต้องการ

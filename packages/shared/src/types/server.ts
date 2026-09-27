@@ -94,3 +94,22 @@ export interface UpdateServerPayload {
   autoBackup?: boolean;
   maxCrashRestarts?: number;
 }
+
+/** ข้อมูลสำหรับส่งคำสั่งผ่าน RCON */
+export interface RconCommandPayload {
+  command: string;
+}
+
+/** ผลลัพธ์จากการรันคำสั่ง RCON */
+export interface RconCommandResult {
+  command: string;
+  response: string;
+  executionTimeMs: number;
+}
+
+/** สถานะการเชื่อมต่อ RCON */
+export interface RconStatus {
+  connected: boolean;
+  host: string;
+  port: number;
+}

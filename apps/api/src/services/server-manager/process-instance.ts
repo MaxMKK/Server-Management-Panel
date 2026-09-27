@@ -6,6 +6,7 @@ import pidusage from 'pidusage';
 import { ServerState, ServerStatus, ConsoleOutput } from '@minecraft-panel/shared';
 import { CircularBuffer } from '../../utils/circular-buffer.js';
 import { config, createLogger } from '../../config/index.js';
+import { RconPool } from '../rcon/rcon-pool.js';
 
 export interface ProcessConfig {
   id: string;
@@ -269,6 +270,9 @@ export class ProcessInstance extends EventEmitter {
     const wasStopping = this.state === ServerState.STOPPING;
     this.process = null;
     this.pid = null;
+
+    // ตัดการเชื่อมต่อ RCON ทันทีที่เซิร์ฟเวอร์ปิดตัวลง
+    RconPool.getInstance().disconnect(this.config.id);
 
     if (code === 0 || wasStopping) {
       this.setState(ServerState.OFFLINE);
