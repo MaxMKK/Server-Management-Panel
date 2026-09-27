@@ -215,14 +215,20 @@ export async function serverRoutes(fastify: FastifyInstance): Promise<void> {
         return reply.status(200).send(response);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการปิดเซิร์ฟเวอร์';
+
+        // ตรวจสอบว่า error เกิดจากสถานะไม่ถูกต้อง (เช่น เซิร์ฟเวอร์ไม่ได้ทำงานอยู่)
+        const isStateError = msg.includes('สถานะปัจจุบันคือ') || msg.includes('ไม่พบเซิร์ฟเวอร์');
+        const code = isStateError ? ErrorCode.SERVER_NOT_RUNNING : ErrorCode.INTERNAL_ERROR;
+        const statusCode = isStateError ? 409 : 400;
+
         const response: ApiResponse = {
           success: false,
           error: {
-            code: ErrorCode.INTERNAL_ERROR,
+            code,
             message: msg,
           },
         };
-        return reply.status(400).send(response);
+        return reply.status(statusCode).send(response);
       }
     }
   );

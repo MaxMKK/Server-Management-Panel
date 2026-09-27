@@ -9,6 +9,7 @@ import { authRoutes } from './modules/auth/auth.routes.js';
 import { serverRoutes } from './modules/servers/server.routes.js';
 import { ServerManager } from './services/server-manager/server-manager.js';
 import { RconPool } from './services/rcon/rcon-pool.js';
+import { WebSocketServer } from './services/websocket/socket-server.js';
 
 /**
  * ฟังก์ชันสร้างและตั้งค่า Fastify Application พร้อมปลั๊กอินความปลอดภัยทั้งหมด
@@ -99,11 +100,17 @@ export async function buildApp(): Promise<FastifyInstance> {
     });
   });
 
-  // ── ปิดการเชื่อมต่อ RCON ทั้งหมดเมื่อ Fastify ทำการปิดตัวลง ─────
+  // ── ปิดการเชื่อมต่อ RCON และ WebSocket ทั้งหมดเมื่อ Fastify ทำการปิดตัวลง ─────
   app.addHook('onClose', async () => {
     logger.info('⏹️  กำลังปิดการเชื่อมต่อ RCON ทั้งหมดใน Pool...');
     RconPool.getInstance().destroy();
+
+    logger.info('⏹️  กำลังปิด WebSocket Server...');
+    await WebSocketServer.getInstance().close();
   });
+
+  // ── เริ่มต้นระบบ WebSocket Server ผูกเข้ากับ Fastify raw server ─────
+  WebSocketServer.getInstance().initialize(app.server);
 
   logger.info('✅ ประกอบแอปพลิเคชัน Fastify เรียบร้อยแล้ว');
   return app;
