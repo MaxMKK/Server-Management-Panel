@@ -5,6 +5,9 @@ import rateLimit from '@fastify/rate-limit';
 import cookie from '@fastify/cookie';
 import { config, logger } from './config/index.js';
 import { errorHandler } from './middleware/error-handler.js';
+import { authRoutes } from './modules/auth/auth.routes.js';
+import { serverRoutes } from './modules/servers/server.routes.js';
+import { ServerManager } from './services/server-manager/server-manager.js';
 
 /**
  * ฟังก์ชันสร้างและตั้งค่า Fastify Application พร้อมปลั๊กอินความปลอดภัยทั้งหมด
@@ -62,6 +65,15 @@ export async function buildApp(): Promise<FastifyInstance> {
     };
     return reply.status(200).send(health);
   });
+
+  // ── เส้นทาง API สำหรับ Authentication ──────────────────
+  await app.register(authRoutes, { prefix: '/api/auth' });
+
+  // ── เส้นทาง API สำหรับ จัดการเซิร์ฟเวอร์ Minecraft ────────
+  await app.register(serverRoutes, { prefix: '/api/servers' });
+
+  // ── เริ่มต้นระบบ ServerManager โหลดข้อมูลเซิร์ฟเวอร์ ─────
+  await ServerManager.getInstance().initialize();
 
   // ── ข้อมูลเบื้องต้นของ API ────────────────────────────────
   app.get('/api', async (_request, reply) => {

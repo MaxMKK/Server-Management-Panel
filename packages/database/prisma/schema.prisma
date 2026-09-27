@@ -1,22 +1,171 @@
-// โครงสร้างฐานข้อมูลสำหรับระบบควบคุมเซิร์ฟเวอร์ Minecraft (Prisma Schema)
+// โครงสร้างฐานข้อมูลสำหรับระบบควบคุมเซิร์ฟเวอร์ Minecraft (Prisma Schema - SQLite Edition)
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
-// ─────────────────────────────────────────────────────────────
-// ใน Phase 2 ระบบจะเพิ่มตารางเหล่านี้:
-//   - User (ข้อมูลผู้ใช้)
-//   - Role (ระดับบทบาท: เจ้าของ, ผู้ดูแล, ผู้ใช้ทั่วไป)
-//   - Permission (สิทธิ์รายข้อ)
-//   - RolePermission (ตารางเชื่อมโยงสิทธิ์)
-//   - Session (ประวัติการล็อกอิน)
-//   - Server (ข้อมูลเซิร์ฟเวอร์ Minecraft แต่ละตัว)
-//   - ServerBackup (ประวัติไฟล์สำรองข้อมูล)
-//   - AuditLog (บันทึกกิจกรรมความปลอดภัยทุกขั้นตอน)
-// ─────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────
+// 1. ตารางระดับบทบาท (Role)
+// ──────────────────────────────────────────
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique // OWNER, ADMIN, USER
+  description String
+  priority    Int      @default(0) // ระดับความสำคัญของบทบาท (ยิ่งมากยิ่งสูง)
+  createdAt   DateTime @default(now())
+
+  // ความสัมพันธ์
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+// ──────────────────────────────────────────
+// 2. ตารางสิทธิ์รายข้อ (Permission)
+// ──────────────────────────────────────────
+model Permission {
+  id          String   @id @default(uuid())
+  key         String   @unique // เช่น "server.start", "console.execute"
+  category    String   // หมวดหมู่สิทธิ์ เช่น "Server Management"
+  description String
+
+  // ความสัมพันธ์
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+// ──────────────────────────────────────────
+// 3. ตารางเชื่อมโยงสิทธิ์กับบทบาท (RolePermission)
+// ──────────────────────────────────────────
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String
+  permissionId String
+
+  // ความสัมพันธ์
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ──────────────────────────────────────────
+// 4. ตารางข้อมูลผู้ใช้งาน (User)
+// ──────────────────────────────────────────
+model User {
+  id           String    @id @default(uuid())
+  discordId    String?   @unique // สำหรับล็อกอินด้วย Discord OAuth
+  username     String    @unique // สำหรับบัญชีระบบและ Local Login
+  displayName  String
+  email        String?   @unique
+  passwordHash String?   // รหัสผ่านที่เข้ารหัสแบบ bcrypt (สำหรับ Local Login)
+  avatarUrl    String?
+  roleId       String
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // ความสัมพันธ์
+  role         Role      @relation(fields: [roleId], references: [id])
+  sessions     Session[]
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+// ──────────────────────────────────────────
+// 5. ตารางเซสชันการเข้าสู่ระบบ (Session)
+// ──────────────────────────────────────────
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  // ความสัมพันธ์
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// ──────────────────────────────────────────
+// 6. ตารางเซิร์ฟเวอร์ Minecraft แต่ละตัว (Server)
+// ──────────────────────────────────────────
+model Server {
+  id                     String    @id @default(uuid())
+  name                   String
+  slug                   String    @unique
+  rootPath               String    // C:\MinecraftServers\survival
+  jarFile                String    // paper.jar
+  javaPath               String    @default("java")
+  javaArgs               String    @default("")
+  gamePort               Int       @unique
+  rconPort               Int       @unique
+  rconPasswordEncrypted  String    // เข้ารหัสด้วย AES-256
+  minMemory              String    @default("2G")
+  maxMemory              String    @default("4G")
+  autoRestart            Boolean   @default(false)
+  autoBackup             Boolean   @default(false)
+  maxCrashRestarts       Int       @default(3)
+  sortOrder              Int       @default(0)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  // ความสัมพันธ์
+  backups                ServerBackup[]
+  auditLogs              AuditLog[]
+
+  @@map("servers")
+}
+
+// ──────────────────────────────────────────
+// 7. ตารางบันทึกไฟล์สำรองข้อมูล (ServerBackup)
+// ──────────────────────────────────────────
+model ServerBackup {
+  id         String   @id @default(uuid())
+  serverId   String
+  filename   String
+  sizeBytes  Int      @default(0)
+  status     String   @default("COMPLETED") // COMPLETED, FAILED, IN_PROGRESS
+  backupType String   @default("MANUAL")    // MANUAL, SCHEDULED
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  // ความสัมพันธ์
+  server     Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@map("server_backups")
+}
+
+// ──────────────────────────────────────────
+// 8. ตารางบันทึกประวัติการกระทำสำคัญ (AuditLog)
+// ──────────────────────────────────────────
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  serverId  String?
+  action    String   // เช่น "AUTH_LOGIN", "SERVER_START", "COMMAND_EXECUTE"
+  category  String   // เช่น "SECURITY", "SERVER", "CONSOLE"
+  details   String?  // ข้อมูลเพิ่มเติมในรูปแบบ JSON string
+  ipAddress String?
+  result    String   @default("SUCCESS") // SUCCESS, FAILURE
+  createdAt DateTime @default(now())
+
+  // ความสัมพันธ์
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  server    Server?  @relation(fields: [serverId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}

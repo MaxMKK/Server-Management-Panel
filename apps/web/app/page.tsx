@@ -1,7 +1,67 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Terminal, Shield, Server, Activity, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Terminal, Shield, Server, Activity, ArrowRight, CheckCircle2, User, LogOut, ShieldAlert } from "lucide-react";
+
+interface UserProfile {
+  username: string;
+  displayName: string;
+  role: string;
+  permissions: string[];
+}
 
 export default function Home() {
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+
+  // ตรวจสอบสถานะการเข้าสู่ระบบจาก LocalStorage และ API
+  useEffect(() => {
+    const savedProfile = localStorage.getItem("user_profile");
+    if (savedProfile) {
+      try {
+        setCurrentUser(JSON.parse(savedProfile));
+      } catch (_e) {
+        // ignore
+      }
+    }
+
+    const token = localStorage.getItem("session_token");
+    if (token) {
+      fetch("http://localhost:4000/api/auth/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.data) {
+            setCurrentUser(data.data);
+            localStorage.setItem("user_profile", JSON.stringify(data.data));
+          } else {
+            // โทเค็นหมดอายุ
+            setCurrentUser(null);
+            localStorage.removeItem("session_token");
+            localStorage.removeItem("user_profile");
+          }
+        })
+        .catch(() => {
+          // หาก backend ขัดข้อง ให้ใช้ข้อมูล cache เดิม
+        });
+    }
+  }, []);
+
+  // ฟังก์ชันออกจากระบบ
+  const handleLogout = () => {
+    const token = localStorage.getItem("session_token");
+    if (token) {
+      fetch("http://localhost:4000/api/auth/logout", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+    }
+    localStorage.removeItem("session_token");
+    localStorage.removeItem("user_profile");
+    setCurrentUser(null);
+  };
+
   return (
     <div className="min-h-screen flex flex-col justify-between p-6 md:p-12 selection:bg-emerald-500/30 selection:text-emerald-300">
       {/* ส่วนหัวของหน้าเว็บ (Header) */}
@@ -20,26 +80,56 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <span className="inline-flex items-center gap-2 text-xs font-mono px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+        <div className="flex items-center gap-3">
+          <span className="hidden sm:inline-flex items-center gap-2 text-xs font-mono px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             System Operational
           </span>
-          <Link
-            href="/login"
-            className="text-xs font-medium px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors border border-zinc-700/50"
-          >
-            Sign In
-          </Link>
+
+          {/* ตรวจสอบว่าเข้าสู่ระบบแล้วหรือยัง */}
+          {currentUser ? (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-emerald-500/30 text-xs">
+                <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+                <span className="font-semibold text-zinc-200">{currentUser.username}</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/50">
+                  {currentUser.role}
+                </span>
+              </div>
+              <button
+                onClick={handleLogout}
+                title="Sign Out"
+                className="p-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-red-400 transition-colors border border-zinc-800"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="text-xs font-medium px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors border border-zinc-700/50"
+            >
+              Sign In
+            </Link>
+          )}
         </div>
       </header>
 
       {/* เนื้อหาหลักของหน้าเว็บ (Hero Section) */}
       <main className="max-w-6xl w-full mx-auto my-auto py-12 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
         <div className="lg:col-span-7 space-y-6 text-left">
-          <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-3 py-1 rounded-md">
-            Phase 1: Project Foundation Verified
-          </div>
+          {/* Badge แสดงสถานะ Session ล่าสุด */}
+          {currentUser ? (
+            <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-emerald-300 bg-emerald-950/60 border border-emerald-600/50 px-3.5 py-1.5 rounded-md shadow-sm">
+              <Shield className="w-3.5 h-3.5 text-emerald-400" />
+              Authenticated Session Active: {currentUser.role} Access (28 Permissions)
+            </div>
+          ) : (
+            <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-1 rounded-md">
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+              Guest Session — Please Sign In
+            </div>
+          )}
 
           <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight text-white leading-tight">
             High-Performance Control for Multiple <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">Paper Servers</span>
@@ -51,13 +141,23 @@ export default function Home() {
           </p>
 
           <div className="flex flex-wrap items-center gap-4 pt-2">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-zinc-950 font-semibold shadow-lg shadow-emerald-500/25 transition-all transform hover:-translate-y-0.5"
-            >
-              Enter Dashboard
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            {currentUser ? (
+              <button
+                onClick={() => alert(`Logged in as: ${currentUser.username}\nRole: ${currentUser.role}\nTotal Permissions: ${currentUser.permissions.length}\n\nPhase 3: Server Agent will unlock real-time server controls!`)}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-zinc-950 font-semibold shadow-lg shadow-emerald-500/25 transition-all transform hover:-translate-y-0.5 cursor-pointer"
+              >
+                Access Server Controls
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-zinc-950 font-semibold shadow-lg shadow-emerald-500/25 transition-all transform hover:-translate-y-0.5"
+              >
+                Sign In to Control
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            )}
 
             <a
               href="http://localhost:4000/api/health"
@@ -82,7 +182,7 @@ export default function Home() {
             </div>
             <div>
               <div className="text-2xl font-bold font-mono text-cyan-400">RBAC</div>
-              <div className="text-xs text-zinc-500">Discord OAuth2</div>
+              <div className="text-xs text-zinc-500">SQLite Database</div>
             </div>
           </div>
         </div>
@@ -104,14 +204,15 @@ export default function Home() {
               <p className="text-emerald-400">✓ Monorepo Architecture: Turborepo + npm workspaces</p>
               <p className="text-zinc-300">✓ Fastify Core API: Port 4000 (Active)</p>
               <p className="text-zinc-300">✓ Next.js 15 Web Core: Port 3000 (Active)</p>
-              <p className="text-zinc-300">✓ Shared Typed System: @minecraft-panel/shared</p>
+              <p className="text-zinc-300">✓ Database: SQLite (dev.db synchronized via Prisma)</p>
               <p className="text-zinc-500">------------------------------------------</p>
               <p className="text-cyan-400 flex items-center gap-1">
-                <Shield className="w-3 h-3 inline" /> Zero-Trust Windows Process Isolation ready
+                <Shield className="w-3 h-3 inline" /> 
+                {currentUser ? `Active Operator: ${currentUser.username} (${currentUser.role})` : "Zero-Trust: No Operator Authenticated"}
               </p>
               <div className="pt-2 flex items-center gap-2 text-emerald-500">
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Phase 1 Verified — Standing by for Phase 2 DB Link</span>
+                <span>Phase 2 Database & Auth Verified</span>
               </div>
             </div>
           </div>
@@ -123,7 +224,7 @@ export default function Home() {
         <div>Minecraft Server Management Panel © 2026. Production Standard.</div>
         <div className="flex gap-6 font-mono">
           <span>Backend: Fastify 5.x</span>
-          <span>Frontend: Next.js 15</span>
+          <span>Database: SQLite</span>
           <span>Theme: Dark Gaming</span>
         </div>
       </footer>
