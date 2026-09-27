@@ -1,6 +1,6 @@
 import net from 'net';
 import { prisma } from '@minecraft-panel/database';
-import { ServerInfo } from '@minecraft-panel/shared';
+import { ServerInfo, ServerStatus } from '@minecraft-panel/shared';
 import { ProcessInstance, ProcessConfig } from './process-instance.js';
 import { createLogger } from '../../config/index.js';
 
@@ -58,7 +58,7 @@ export class ServerManager {
 
     // ดักจับ Event จาก Instance
     instance.on('state_change', ({ serverId, oldState, newState }) => {
-      this.logger.info(`[Server: ${config.name}] สถานะเปลี่ยนจาก ${oldState} ➔ ${newState}`);
+      this.logger.info(`[Server: ${config.name} (${serverId})] สถานะเปลี่ยนจาก ${oldState} ➔ ${newState}`);
     });
 
     this.instances.set(config.id, instance);
@@ -68,6 +68,15 @@ export class ServerManager {
   /** ดึง ProcessInstance ตาม ID */
   public getInstance(serverId: string): ProcessInstance | undefined {
     return this.instances.get(serverId);
+  }
+
+  /** ดึงสถานะและ Telemetry ของเซิร์ฟเวอร์ตาม ID */
+  public async getServerStatus(serverId: string): Promise<ServerStatus> {
+    const instance = this.instances.get(serverId);
+    if (!instance) {
+      throw new Error('ไม่พบเซิร์ฟเวอร์นี้ในระบบ');
+    }
+    return instance.getTelemetry();
   }
 
   /** ตรวจสอบว่าพอร์ตว่างหรือไม่ */

@@ -5,7 +5,7 @@ import { EventEmitter } from 'events';
 import pidusage from 'pidusage';
 import { ServerState, ServerStatus, ConsoleOutput } from '@minecraft-panel/shared';
 import { CircularBuffer } from '../../utils/circular-buffer.js';
-import { createLogger } from '../../config/index.js';
+import { config, createLogger } from '../../config/index.js';
 
 export interface ProcessConfig {
   id: string;
@@ -60,6 +60,27 @@ export class ProcessInstance extends EventEmitter {
     return this.consoleBuffer.getRecent(limit);
   }
 
+  /** ค้นหาและระบุตำแหน่งของ Java Runtime บน Windows อัตโนมัติ */
+  private resolveJavaPath(configuredPath: string): string {
+    if (configuredPath && configuredPath !== 'java' && fs.existsSync(configuredPath)) {
+      return configuredPath;
+    }
+    if (config.MC_DEFAULT_JAVA_PATH && fs.existsSync(config.MC_DEFAULT_JAVA_PATH)) {
+      return config.MC_DEFAULT_JAVA_PATH;
+    }
+    const adoptiumBase = 'C:\\Program Files\\Eclipse Adoptium';
+    if (fs.existsSync(adoptiumBase)) {
+      const dirs = fs.readdirSync(adoptiumBase);
+      for (const dir of dirs) {
+        const candidate = path.join(adoptiumBase, dir, 'bin', 'java.exe');
+        if (fs.existsSync(candidate)) {
+          return candidate;
+        }
+      }
+    }
+    return configuredPath || 'java';
+  }
+
   /** สั่งเปิดเซิร์ฟเวอร์ (Start Sequence) */
   public async start(): Promise<void> {
     if (this.state !== ServerState.OFFLINE && this.state !== ServerState.CRASHED) {
@@ -93,12 +114,13 @@ export class ProcessInstance extends EventEmitter {
 
     args.push('-jar', path.basename(jarFullPath), 'nogui');
 
-    this.logger.info(`[${this.config.name}] กำลังเปิดเซิร์ฟเวอร์: ${this.config.javaPath} ${args.join(' ')}`);
+    const effectiveJavaPath = this.resolveJavaPath(this.config.javaPath);
+    this.logger.info(`[${this.config.name}] กำลังเปิดเซิร์ฟเวอร์: ${effectiveJavaPath} ${args.join(' ')}`);
     this.setState(ServerState.STARTING);
 
     try {
       // 4. สั่ง Spawn Process บน Windows โดยตั้ง cwd เป็นโฟลเดอร์เซิร์ฟเวอร์
-      this.process = spawn(this.config.javaPath, args, {
+      this.process = spawn(effectiveJavaPath, args, {
         cwd: this.config.rootPath,
         stdio: ['pipe', 'pipe', 'pipe'],
         windowsHide: true,
