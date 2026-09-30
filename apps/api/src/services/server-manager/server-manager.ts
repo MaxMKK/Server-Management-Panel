@@ -189,4 +189,59 @@ export class ServerManager {
 
     return result;
   }
+
+  /** ดึงข้อมูลรวมของเซิร์ฟเวอร์เดี่ยวตาม ID */
+  public async getServerInfo(serverId: string): Promise<ServerInfo | null> {
+    const dbServer = await prisma.server.findUnique({
+      where: { id: serverId },
+    });
+
+    if (!dbServer) {
+      return null;
+    }
+
+    let instance = this.instances.get(dbServer.id);
+    if (!instance) {
+      instance = this.registerServer({
+        id: dbServer.id,
+        name: dbServer.name,
+        rootPath: dbServer.rootPath,
+        jarFile: dbServer.jarFile,
+        javaPath: dbServer.javaPath,
+        javaArgs: dbServer.javaArgs,
+        gamePort: dbServer.gamePort,
+        rconPort: dbServer.rconPort,
+        minMemory: dbServer.minMemory,
+        maxMemory: dbServer.maxMemory,
+        autoRestart: dbServer.autoRestart,
+        maxCrashRestarts: dbServer.maxCrashRestarts,
+      });
+    }
+
+    const telemetry = await instance.getTelemetry();
+
+    return {
+      config: {
+        id: dbServer.id,
+        name: dbServer.name,
+        slug: dbServer.slug,
+        rootPath: dbServer.rootPath,
+        jarFile: dbServer.jarFile,
+        javaPath: dbServer.javaPath,
+        javaArgs: dbServer.javaArgs,
+        gamePort: dbServer.gamePort,
+        rconPort: dbServer.rconPort,
+        minMemory: dbServer.minMemory,
+        maxMemory: dbServer.maxMemory,
+        autoRestart: dbServer.autoRestart,
+        autoBackup: dbServer.autoBackup,
+        maxCrashRestarts: dbServer.maxCrashRestarts,
+        sortOrder: dbServer.sortOrder,
+        createdAt: dbServer.createdAt.toISOString(),
+        updatedAt: dbServer.updatedAt.toISOString(),
+      },
+      status: telemetry,
+    };
+  }
 }
+

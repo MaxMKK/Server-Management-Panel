@@ -142,13 +142,13 @@ export default function Home() {
 
           <div className="flex flex-wrap items-center gap-4 pt-2">
             {currentUser ? (
-              <button
-                onClick={() => alert(`Logged in as: ${currentUser.username}\nRole: ${currentUser.role}\nTotal Permissions: ${currentUser.permissions.length}\n\nPhase 3: Server Agent will unlock real-time server controls!`)}
+              <Link
+                href="/dashboard"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-zinc-950 font-semibold shadow-lg shadow-emerald-500/25 transition-all transform hover:-translate-y-0.5 cursor-pointer"
               >
                 Access Server Controls
                 <ArrowRight className="w-4 h-4" />
-              </button>
+              </Link>
             ) : (
               <Link
                 href="/login"

@@ -48,6 +48,33 @@ export async function serverRoutes(fastify: FastifyInstance): Promise<void> {
     }
   );
 
+  // ── 1.1 ดึงข้อมูลเซิร์ฟเวอร์เดี่ยวพร้อมสถานะ (GET /api/servers/:id) ───────
+  fastify.get<{ Params: ServerIdParams }>(
+    '/:id',
+    { preHandler: [authenticate, requirePermission(Permission.SERVER_VIEW)] },
+    async (request, reply) => {
+      const { id } = request.params;
+      const server = await serverManager.getServerInfo(id);
+
+      if (!server) {
+        const response: ApiResponse = {
+          success: false,
+          error: {
+            code: ErrorCode.SERVER_NOT_FOUND,
+            message: 'ไม่พบเซิร์ฟเวอร์นี้ในระบบ',
+          },
+        };
+        return reply.status(404).send(response);
+      }
+
+      const response: ApiResponse = {
+        success: true,
+        data: server,
+      };
+      return reply.status(200).send(response);
+    }
+  );
+
   // ── 2. ลงทะเบียนเซิร์ฟเวอร์ใหม่ (POST /api/servers) ─────────────────────
   fastify.post(
     '/',
@@ -309,16 +336,26 @@ export async function serverRoutes(fastify: FastifyInstance): Promise<void> {
       const { id } = request.params;
       const limit = parseInt(request.query.limit || '100', 10);
 
-      const instance = serverManager.getInstance(id);
+      let instance = serverManager.getInstance(id);
       if (!instance) {
+        // ตรวจสอบว่าเซิร์ฟเวอร์มีอยู่ในฐานข้อมูลหรือไม่
+        const serverExists = await prisma.server.findUnique({ where: { id } });
+        if (!serverExists) {
+          const response: ApiResponse = {
+            success: false,
+            error: {
+              code: ErrorCode.SERVER_NOT_FOUND,
+              message: 'ไม่พบเซิร์ฟเวอร์นี้ในระบบ',
+            },
+          };
+          return reply.status(404).send(response);
+        }
+        // เซิร์ฟเวอร์มีอยู่แต่ยังไม่เคยรัน
         const response: ApiResponse = {
-          success: false,
-          error: {
-            code: ErrorCode.SERVER_NOT_FOUND,
-            message: 'ไม่พบเซิร์ฟเวอร์นี้ในระบบ',
-          },
+          success: true,
+          data: [],
         };
-        return reply.status(404).send(response);
+        return reply.status(200).send(response);
       }
 
       const logs = instance.getLogs(limit);
