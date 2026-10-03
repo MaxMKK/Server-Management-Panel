@@ -43,6 +43,8 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // ปลั๊กอิน Cookie: สำหรับอ่านและเขียน Cookie ยืนยันตัวตนแบบปลอดภัย
   await app.register(cookie);
+await app.register(require('@fastify/multipart'), { limits: { fileSize: 500 * 1024 * 1024 } });
+await app.register(require('@fastify/multipart'), { limits: { fileSize: 500 * 1024 * 1024 } });
 
   // ── ตัวจัดการข้อผิดพลาดส่วนกลาง ────────────────────────────
   app.setErrorHandler(errorHandler);

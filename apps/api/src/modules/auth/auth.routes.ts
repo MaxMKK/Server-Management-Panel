@@ -72,7 +72,9 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     }
 
     // ดึงรายการ Permission keys ทั้งหมดที่ Role นี้ได้รับ
-    const permissions = user.role.permissions.map((rp) => rp.permission.key);
+    const permissions = user.role.permissions.map(
+      (rp: { permission: { key: string } }) => rp.permission.key
+    );
 
     // สร้าง JWT Token
     const token = JwtService.sign({
@@ -157,7 +159,9 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       return reply.status(401).send(response);
     }
 
-    const permissions = user.role.permissions.map((rp) => rp.permission.key);
+    const permissions = user.role.permissions.map(
+      (rp: { permission: { key: string } }) => rp.permission.key
+    );
 
     const response: ApiResponse = {
       success: true,
